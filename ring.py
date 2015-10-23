@@ -2,7 +2,7 @@
 
 from socket import AF_INET, SO_REUSEADDR, SOCK_STREAM, SOL_SOCKET, \
 gethostname, socket
-from sys import getsizeof, argv
+from sys import argv, getsizeof
 from threading import Lock, Thread
 
 TOKEN = 'tok'
@@ -21,32 +21,31 @@ class Process(Thread):
         if not has_token:
             self.next = socket(AF_INET, SOCK_STREAM)
             self.next.connect(next_addr)
-            print 'conectado a siguiente {}'.format(next_addr)
+            print 'conectado a siguiente en {}'.format(next_addr)
         server = socket(AF_INET, SOCK_STREAM)
         server.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
         server.bind((gethostname(), port))
         server.listen(0)
         self.previous, previous_addr = server.accept()
-        print 'anterior conectado en {}'.format(previous_addr)
+        print 'anterior conectado desde {}'.format(previous_addr)
         self.lock = Lock()
         self.lock.acquire(False)
         if has_token:
             raw_input('enter para conectar ')
             self.next = socket(AF_INET, SOCK_STREAM)
             self.next.connect(next_addr)
-            print 'conectado a siguiente {}'.format(next_addr)
+            print 'conectado a siguiente en {}'.format(next_addr)
             self.lock.release()
         self.stopped = False
 
-    def cs_stuff(self):
-        while True:
+    def work(self):
+        while not self.stopped:
             answer = raw_input('¿necesito región crítica? (y/n/x) ')
             if answer in 'yYsS':
                 with self.lock:
                     raw_input('enter para liberar ')
             elif answer in 'xX':
                 self.stopped = True
-                return
 
     def algorithm(self):
         while not self.stopped:
@@ -58,11 +57,11 @@ class Process(Thread):
             self.next.send(TOKEN)
 
     def run(self):
+        work_thread = Thread(target=self.work)
         algorithm_thread = Thread(target=self.algorithm)
-        cs_stuff_thread = Thread(target=self.cs_stuff)
+        work_thread.start()
         algorithm_thread.start()
-        cs_stuff_thread.start()
-        cs_stuff_thread.join()
+        work_thread.join()
         algorithm_thread.join()
         self.next.close()
         self.previous.close()
